@@ -74,6 +74,8 @@ class Bridge:
                         counts = owner.stats['rejections']
                         counts[reason] = counts.get(reason, 0) + 1
                         logging.info('bridge request rejected reason=%s', reason)
+                        if reason == 'invalid_origin':
+                            logging.info('bridge origin format browser=%r declared=%r', browser_origin[:100], declared_origin[:100])
                         return False
                     owner.stats['authenticated'] += 1
                     if owner.origin is None:
