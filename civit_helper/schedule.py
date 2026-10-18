@@ -1,6 +1,6 @@
 import csv
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from xml.sax.saxutils import escape
 from .state import TAIPEI
 
@@ -14,24 +14,24 @@ def task_xml(project, pythonw, user_sid=None):
         user_sid = next(csv.reader([text.strip()]))[1]
     if not user_sid.startswith('S-1-'):
         raise ValueError('無法取得目前 Windows 使用者 SID。')
-    first = datetime.now(TAIPEI).replace(hour=4, minute=0, second=0, microsecond=0)
-    # Today's missed trigger is intentionally eligible for StartWhenAvailable.
+    now = datetime.now(TAIPEI)
+    first = now.replace(hour=4, minute=0, second=0, microsecond=0)
+    if first <= now:
+        first += timedelta(days=1)
     return f'''<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Civit Helper：台灣時間 04:00；未完成每 30 分鐘補跑。</Description></RegistrationInfo>
+  <RegistrationInfo><Description>Civit Helper：僅每天台灣時間 04:00；錯過不自動補跑。</Description></RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
-      <Repetition><Interval>PT30M</Interval><Duration>P1D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
       <StartBoundary>{first.isoformat()}</StartBoundary><Enabled>true</Enabled>
       <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
     </CalendarTrigger>
-    <LogonTrigger><Enabled>true</Enabled><UserId>{escape(user_sid)}</UserId><Delay>PT2M</Delay></LogonTrigger>
   </Triggers>
   <Principals><Principal id="User"><UserId>{escape(user_sid)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <StartWhenAvailable>false</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
     <AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>true</Hidden>
     <WakeToRun>false</WakeToRun><ExecutionTimeLimit>PT25M</ExecutionTimeLimit>
   </Settings>

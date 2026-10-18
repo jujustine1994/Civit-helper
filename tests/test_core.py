@@ -104,7 +104,11 @@ class CoreTests(unittest.TestCase):
 
     def test_auto_before_four_skips_manual_does_not(self):
         self.assertFalse(automatic_allowed(datetime(2026, 10, 18, 3, 59)))
-        self.assertTrue(automatic_allowed(self.now()))
+        self.assertTrue(automatic_allowed(self.now().replace(hour=4, minute=0)))
+        self.assertTrue(automatic_allowed(self.now().replace(hour=4, minute=3)))
+        self.assertFalse(automatic_allowed(self.now().replace(hour=4, minute=5)))
+        self.assertFalse(automatic_allowed(self.now()))
+        self.assertFalse(automatic_allowed(self.now().replace(hour=18)))
 
     def test_lock_reentry_and_release(self):
         p = Path(self.tmp.name) / 'run.lock'

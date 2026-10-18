@@ -5,14 +5,14 @@ from civit_helper.schedule import task_xml
 
 
 class ScheduleTests(unittest.TestCase):
-    def test_schedule_taipei_retry_and_hidden_without_password(self):
+    def test_schedule_runs_only_daily_at_four_without_catchup(self):
         xml = task_xml(Path('C:/Test Folder/Civit Helper'), Path('C:/Python/pythonw.exe'))
         root = ET.fromstring(xml)
         ns = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
         get = lambda p: root.find(p, ns).text
         self.assertTrue(get('.//t:StartBoundary').endswith('T04:00:00+08:00'))
-        self.assertEqual(get('.//t:Interval'), 'PT30M')
-        self.assertEqual(get('.//t:StartWhenAvailable'), 'true')
+        self.assertIsNone(root.find('.//t:Repetition', ns))
+        self.assertEqual(get('.//t:StartWhenAvailable'), 'false')
         self.assertEqual(get('.//t:WakeToRun'), 'false')
         self.assertEqual(get('.//t:MultipleInstancesPolicy'), 'IgnoreNew')
         self.assertEqual(Path(get('.//t:Command')), Path('C:/Python/pythonw.exe'))
@@ -24,10 +24,10 @@ class ScheduleTests(unittest.TestCase):
         ns = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
         self.assertEqual(Path(root.find('.//t:WorkingDirectory', ns).text), Path('C:/A&B'))
 
-    def test_logon_trigger_scoped_to_same_user_as_principal(self):
+    def test_no_logon_trigger_and_current_user_principal(self):
         root = ET.fromstring(task_xml(Path('C:/Tool'), Path('C:/Python/pythonw.exe'), user_sid='S-1-5-21-123'))
         ns = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
-        self.assertEqual(root.find('.//t:LogonTrigger/t:UserId', ns).text, 'S-1-5-21-123')
+        self.assertIsNone(root.find('.//t:LogonTrigger', ns))
         self.assertEqual(root.find('.//t:Principal/t:UserId', ns).text, 'S-1-5-21-123')
 
 

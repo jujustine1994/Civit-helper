@@ -41,7 +41,7 @@ def main(argv=None):
             store.close()
         return 0
     if args.command == 'run' and args.source == 'scheduled' and not automatic_allowed(taipei_now()):
-        output({'status': 'waiting', 'message': '台灣時間 04:00 前，等待當日排程。'})
+        output({'status': 'waiting', 'message': '目前不是台灣時間 04:00 排程時段；不自動執行，需補跑請手動啟動。'})
         return 0
     store = None
     run_id = None
@@ -75,7 +75,7 @@ def main(argv=None):
                     output({'status': 'cancelled', 'message': message})
                     return 0
                 if taipei_now().date().isoformat() != day or not automatic_allowed(taipei_now()):
-                    message = '倒數期間已跨日，等待台灣時間 04:00 再執行。'
+                    message = '已離開台灣時間 04:00 排程時段，本次不執行。'
                     store.end_run(run_id, 'waiting', message)
                     output({'status': 'waiting', 'message': message})
                     return 0

@@ -12,7 +12,8 @@ class RunWindowExpired(RuntimeError):
 def automatic_allowed(now):
     if now.tzinfo is not None:
         now = now.astimezone(TAIPEI)
-    return now.hour >= 4
+    # Includes the 3-minute notice, but never allows daytime catch-up.
+    return now.hour == 4 and now.minute < 5
 
 
 def execute(store, site, *, now=taipei_now, seconds=1200):

@@ -43,6 +43,7 @@
 - [ ] 獨立審閱、修正重要問題；請用戶一次載入擴充功能，再驗證登入後讀取和實際任務。
 
 ## Ledger
+2026-10-18 timing correction (supersedes earlier retry rulings): 用戶明確要求僅早上04:00，移除30分鐘重複、LogonTrigger、StartWhenAvailable。安裝起點取下一個04:00；CLI阻擋白天自動啟動。關閉提醒／失敗當日不自動重試，只能手動補跑。14項相關測試通過，Windows讀回下次2026-10-19 04:00+08:00。
 Ruling: 使用者選擇日常Chrome擴充功能，這是明確需求變更，取代原專用profile主要路徑；舊adapter暫留做已有fixture測試，不再由預設CLI呼叫。
 Ruling: 關閉通知取消「當次」排程，30分鐘後未完成補跑會再次通知。代價：仍在工作時可能再看到提醒。
 Spec review: 無須再問用戶的重要歧義；token 不送入MAIN世界、命令以ID關聯且不重送。
