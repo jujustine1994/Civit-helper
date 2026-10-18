@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 runtime/
 .worktrees/
+extension/local-config.json

@@ -25,3 +25,8 @@ def open_native_login(chrome=None, profile=None):
     # The process lock stays held until the user closes this dedicated Chrome.
     process = subprocess.Popen(command)
     process.wait()
+
+
+def open_daily_browser():
+    """Normal Chrome tab: browser owns its existing profile and sign-in flow."""
+    subprocess.Popen([str(chrome_path()), 'https://civitai.red/images'])

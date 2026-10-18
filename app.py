@@ -56,31 +56,53 @@ def main(argv=None):
                 return 0
             run_id = store.start_run(args.source + '/' + args.command)
             logging.info('run_id=%s started', run_id)
-            from civit_helper.site import ChromeSite, LoginRequired, VerificationRequired
+            from civit_helper.notice import requires_warning, confirm_scheduled_run
+            if requires_warning(args.command, args.source):
+                message = '排程倒數 3 分鐘；關閉通知即可取消這次執行。'
+                with store.db:
+                    store.db.execute('UPDATE runs SET message=? WHERE id=?', (message, run_id))
+                logging.info('run_id=%s %s', run_id, message)
+                try:
+                    accepted = confirm_scheduled_run()
+                except Exception:
+                    store.end_run(run_id, 'error', '無法顯示排程倒數通知，本次不執行。')
+                    logging.error('run_id=%s countdown UI unavailable; no browser work started', run_id)
+                    return 2
+                if not accepted:
+                    message = '使用者關閉通知，已取消這次排程；當日進度保留。'
+                    store.end_run(run_id, 'cancelled', message)
+                    logging.info('run_id=%s %s', run_id, message)
+                    output({'status': 'cancelled', 'message': message})
+                    return 0
+                if taipei_now().date().isoformat() != day or not automatic_allowed(taipei_now()):
+                    message = '倒數期間已跨日，等待台灣時間 04:00 再執行。'
+                    store.end_run(run_id, 'waiting', message)
+                    output({'status': 'waiting', 'message': message})
+                    return 0
+            from civit_helper.site import LoginRequired, VerificationRequired
+            from civit_helper.bridge import BridgeError, ensure_extension_config
+            from civit_helper.remote_site import BridgeSite
             try:
+                ensure_extension_config()
                 if args.command == 'login':
-                    from civit_helper.login import open_native_login
-                    message = '請在專用 Chrome 親自登入；成功後關閉這個專用 Chrome 視窗，工具才會檢查登入。'
+                    from civit_helper.login import open_daily_browser
+                    open_daily_browser()
+                    result = {'status': 'setup_required', 'message': '已開啟日常 Chrome 的 Civitai，請正常登入；載入擴充功能後按「檢查網站」。'}
+                else:
                     with store.db:
-                        store.db.execute('UPDATE runs SET message=? WHERE id=?', (message, run_id))
-                    logging.info(message)
-                    open_native_login()
-                with ChromeSite(headed=False, seconds=1200) as site:
-                    if args.command == 'login':
-                        account = site.account()
-                        store.bind(account)
-                        result = {'status': 'ready', 'message': '登入已保存；可按「檢查網站」或「立即執行」。'}
-                    elif args.command == 'inspect':
-                        diagnostic = site.inspect()
-                        if diagnostic.get('logged_in'):
-                            store.bind(diagnostic['account'])
-                        (RUNTIME / 'diagnostic.json').write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding='utf-8')
-                        result = {'status': 'ready' if diagnostic.get('logged_in') else 'login_required',
-                                  'message': ('網站只讀檢查完成；尚未測試實際愛心與追蹤。' if diagnostic.get('logged_in') else
-                                              '背景 Chrome 及圖片來源正常；請先登入工具專用 Chrome。'),
-                                  'diagnostic': diagnostic}
-                    else:
-                        result = execute(store, site)
+                        store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待日常 Chrome 擴充功能連線，請確認已載入 Civit Helper。', run_id))
+                    with BridgeSite(seconds=1200) as site:
+                        if args.command == 'inspect':
+                            diagnostic = site.inspect()
+                            if diagnostic.get('logged_in'):
+                                store.bind(diagnostic['account'])
+                            (RUNTIME / 'diagnostic.json').write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding='utf-8')
+                            result = {'status': 'ready' if diagnostic.get('logged_in') else 'login_required',
+                                      'message': ('日常 Chrome 只讀檢查完成；尚未測試實際愛心與追蹤。' if diagnostic.get('logged_in') else
+                                                  '擴充功能已連線；請在日常 Chrome 登入 Civitai。'),
+                                      'diagnostic': diagnostic}
+                        else:
+                            result = execute(store, site)
             except Exception as exc:
                 from civit_helper.site import VerificationRequired
                 if isinstance(exc, LoginRequired):
@@ -90,14 +112,14 @@ def main(argv=None):
                 else:
                     status = 'error'
                 # Do not dump arbitrary browser exceptions: they may contain auth URLs.
-                safe = str(exc) if isinstance(exc, (LoginRequired, VerificationRequired, ValueError)) else (
+                safe = str(exc) if isinstance(exc, (LoginRequired, VerificationRequired, ValueError, BridgeError)) else (
                     str(exc) if type(exc).__module__ == 'civit_helper.site' else
                     f'執行失敗（{type(exc).__name__}），進度已保留；請檢查網路、Chrome 或重新登入。')
                 result = {'status': status, 'message': safe, 'progress': store.progress(day)}
             store.end_run(run_id, result['status'], result['message'])
             logging.info('run_id=%s result=%s', run_id, json.dumps(result, ensure_ascii=False))
             output(result)
-            return 0 if result['status'] in ('complete', 'ready') else 2
+            return 0 if result['status'] in ('complete', 'ready', 'setup_required') else 2
     except BusyError as exc:
         output({'status': 'busy', 'message': str(exc)})
         return 5

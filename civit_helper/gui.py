@@ -9,14 +9,15 @@ from .state import ROOT, RUNTIME, Store, taipei_now
 LABELS = {'running': '執行中', 'complete': '今日已完成', 'partial': '部分完成，等待補跑',
           'stalled': '搜尋停滯，等待補跑', 'unconfirmed': '操作結果待確認',
           'login_required': '請先登入', 'verification_required': '需要人工檢查',
-          'error': '執行失敗，進度已保留', 'interrupted': '上次中斷，可補跑', 'ready': '已就緒'}
+          'error': '執行失敗，進度已保留', 'interrupted': '上次中斷，可補跑', 'ready': '已就緒',
+          'cancelled': '已取消這次排程', 'setup_required': '請完成登入及擴充功能設定', 'waiting': '等待每日執行時間'}
 
 
 def launch():
     root = tk.Tk()
     root.title('Civit Helper')
-    root.geometry('680x440')
-    root.minsize(640, 420)
+    root.geometry('720x510')
+    root.minsize(680, 490)
     root.configure(bg='#f4f6fa')
     style = ttk.Style(root)
     style.theme_use('clam')
@@ -28,7 +29,7 @@ def launch():
     frame = ttk.Frame(root, padding=26)
     frame.pack(fill='both', expand=True)
     ttk.Label(frame, text='Civit Helper', style='Title.TLabel').pack(anchor='w')
-    ttk.Label(frame, text='每天台灣時間 04:00 背景執行 · 未完成每 30 分鐘補跑').pack(anchor='w', pady=(6, 18))
+    ttk.Label(frame, text='日常 Chrome 擴充功能 · 每天 04:00 · 排程前 3 分鐘倒數').pack(anchor='w', pady=(6, 18))
     progress = ttk.Label(frame, style='Progress.TLabel')
     progress.pack(anchor='w')
     date_label = ttk.Label(frame)
@@ -52,7 +53,7 @@ def launch():
         state['child'] = subprocess.Popen(
             [sys.executable, str(ROOT / 'app.py'), command], cwd=ROOT,
             stdout=stream, stderr=stream, creationflags=subprocess.CREATE_NO_WINDOW)
-        detail.configure(text='已啟動。' + ('請在專用 Chrome 登入；成功後關閉這個專用視窗，工具才會檢查登入。' if command == 'login' else '結果將自動更新。'))
+        detail.configure(text='已啟動。' + ('請在日常 Chrome 正常登入 Civitai。' if command == 'login' else '請確認日常 Chrome 已載入 Civit Helper；結果將自動更新。'))
 
     for label, command in [('立即執行', 'run'), ('登入／重新登入', 'login'), ('檢查網站', 'inspect')]:
         button = ttk.Button(buttons, text=label, command=lambda cmd=command: start(cmd))
@@ -72,7 +73,13 @@ def launch():
         text.see('end')
 
     ttk.Button(frame, text='查看 log 紀錄', command=view_logs).pack(anchor='w', pady=(12, 0))
-    ttk.Label(frame, text='首次使用：登入 → 檢查網站 → 立即執行。\n關閉此工具視窗不會取消已啟動的工作或每日排程。',
+    def extension_folder():
+        from .bridge import ensure_extension_config
+        ensure_extension_config()
+        os.startfile(ROOT / 'extension')
+
+    ttk.Button(frame, text='開啟擴充功能資料夾', command=extension_folder).pack(anchor='w', pady=(10, 0))
+    ttk.Label(frame, text='首次使用：Chrome 載入 extension 資料夾 → 檢查網站 → 立即執行。\n手動執行不倒數；排程通知按 X 可取消當次。',
               foreground='#566274').pack(anchor='w', pady=(16, 0))
 
     def refresh():
@@ -86,7 +93,7 @@ def launch():
             progress.configure(text=f'❤️ 愛心 {counts["heart"]} / 50     ·     追蹤 {counts["follow"]} / 3')
             date_label.configure(text=f'台灣日期：{data["day"]}   ·   待確認操作：{data["pending"]}')
             run = data['last_run']
-            status.configure(text=LABELS.get(run['status'], run['status']) if run else '尚未設定登入，請先登入工具專用 Chrome。')
+            status.configure(text=LABELS.get(run['status'], run['status']) if run else '請先在日常 Chrome 載入擴充功能並登入 Civitai。')
             if run:
                 detail.configure(text=run['message'])
             child = state['child']

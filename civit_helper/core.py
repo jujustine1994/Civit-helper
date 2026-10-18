@@ -28,6 +28,8 @@ def execute(store, site, *, now=taipei_now, seconds=1200):
         return now().date().isoformat() != day or time.monotonic() >= deadline
 
     site.before_write = lambda: not expired()
+    site.work_day = day
+    site.write_expires_at = int((time.time() + max(0, min(deadline, getattr(site, 'deadline', deadline)) - time.monotonic())) * 1000)
 
     for original_day, kind, target in store.pending():
         if expired():
