@@ -1,6 +1,7 @@
 """Short-lived authenticated loopback transport; never exports browser cookies."""
 import hmac
 import json
+import logging
 import queue
 import re
 import secrets
@@ -39,6 +40,11 @@ class Bridge:
         self.queue = queue.Queue()
         self.pending = {}
         self.lock = threading.Lock()
+        self.stats = {'requests_received': 0, 'authenticated': 0, 'rejections': {}, 'last_command': None}
+
+    def diagnostics(self):
+        with self.lock:
+            return {**self.stats, 'rejections': dict(self.stats['rejections']), 'paired': self.origin is not None}
 
     def __enter__(self):
         owner = self
@@ -51,12 +57,25 @@ class Bridge:
                 browser_origin = self.headers.get('Origin', '')
                 declared_origin = self.headers.get('X-Civit-Helper-Origin', '')
                 origin = browser_origin or declared_origin
-                if (self.headers.get('Host') != f'127.0.0.1:{owner.port}'
-                        or not re.fullmatch(r'chrome-extension://[a-p]{32}', origin)
-                        or (browser_origin and declared_origin and browser_origin != declared_origin)
-                        or not hmac.compare_digest(self.headers.get('X-Civit-Helper-Token', ''), owner.token)):
-                    return False
+                reason = None
+                if self.headers.get('Host') != f'127.0.0.1:{owner.port}':
+                    reason = 'host_mismatch'
+                elif not re.fullmatch(r'chrome-extension://[a-p]{32}', origin):
+                    reason = 'invalid_origin'
+                elif browser_origin and declared_origin and browser_origin != declared_origin:
+                    reason = 'origin_mismatch'
+                elif not hmac.compare_digest(self.headers.get('X-Civit-Helper-Token', ''), owner.token):
+                    reason = 'token_mismatch'
                 with owner.lock:
+                    owner.stats['requests_received'] += 1
+                    if not reason and owner.origin and owner.origin != origin:
+                        reason = 'paired_extension_mismatch'
+                    if reason:
+                        counts = owner.stats['rejections']
+                        counts[reason] = counts.get(reason, 0) + 1
+                        logging.info('bridge request rejected reason=%s', reason)
+                        return False
+                    owner.stats['authenticated'] += 1
                     if owner.origin is None:
                         owner.origin = origin
                         if owner.pairing_file:
@@ -92,6 +111,9 @@ class Bridge:
                 if not self.allowed():
                     self.reply(403, {'error': 'forbidden'})
                     return
+                if self.path == '/health':
+                    self.reply(200, {'protocol': 1, 'authenticated': True})
+                    return
                 if self.path != '/poll':
                     self.reply(404, {})
                     return
@@ -105,6 +127,8 @@ class Bridge:
                         valid = candidate['id'] in owner.pending
                     if valid and candidate['expiresAt'] > int(time.time() * 1000):
                         command = candidate
+                        with owner.lock:
+                            owner.stats['last_command'] = candidate['op']
                         break
                 self.reply(200, {'command': command})
 
@@ -157,7 +181,15 @@ class Bridge:
         self.queue.put({'id': command_id, 'op': op, 'expiresAt': int((time.time() + timeout) * 1000), **arguments})
         try:
             if not event.wait(timeout):
-                raise BridgeError('Chrome 擴充功能未連線或回應逾時；請確認日常 Chrome 已開啟並載入 Civit Helper。進度已保留。')
+                diagnostics = self.diagnostics()
+                logging.info('bridge timeout diagnostics=%s', json.dumps(diagnostics))
+                if diagnostics['requests_received'] == 0:
+                    message = '本機工具完全沒有收到擴充功能連線；請打開擴充功能的「連線診斷」查看原因。'
+                elif diagnostics['authenticated'] == 0:
+                    message = '收到擴充功能連線，但配對驗證遭拒；請查看連線診斷與 log。'
+                else:
+                    message = '擴充功能已連線，但命令回應逾時；進度已保留，請查看 log。'
+                raise BridgeError(message)
             data = entry['result']
             if not data['ok']:
                 # Worker sends fixed task errors, not arbitrary page URLs or auth data.

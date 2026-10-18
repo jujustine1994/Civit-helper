@@ -82,6 +82,7 @@ async function navigate(path) {
 
 export async function dispatch(command) {
   if (Date.now() >= command.expiresAt) fail('WINDOW_EXPIRED', '命令已過期，沒有操作。');
+  if (command.op === 'ping') return {version: chrome.runtime.getManifest().version, extensionId: chrome.runtime.id};
   if (command.op === 'init') return initialize();
   if (command.op === 'close') {
     const {ownedTab: saved} = await chrome.storage.session.get('ownedTab');
@@ -111,9 +112,10 @@ export async function dispatch(command) {
   return result.result;
 }
 
-async function poll() {
+export async function poll() {
   if (polling) return;
   polling = true;
+  let stage = 'config';
   try {
     const configResponse = await fetch(chrome.runtime.getURL('local-config.json'), {cache: 'no-store'});
     if (!configResponse.ok) throw new Error('config');
@@ -121,6 +123,7 @@ async function poll() {
     const base = `http://127.0.0.1:${config.port}`;
     const headers = {'X-Civit-Helper-Token': config.token, 'X-Civit-Helper-Origin': chrome.runtime.getURL('').replace(/\/$/, ''),
       'Content-Type': 'application/json'};
+    stage = 'connect';
     for (let index = 0; index < 3000; index++) {
       const saved = await chrome.storage.session.get('pendingResult');
       if (saved.pendingResult) {
@@ -130,7 +133,11 @@ async function poll() {
         await chrome.storage.session.remove('pendingResult');
       }
       const response = await fetch(base + '/poll', {headers, signal: AbortSignal.timeout(5000)});
-      if (!response.ok) throw new Error('bridge');
+      if (!response.ok) {
+        const error = new Error(response.status === 403 ? '配對驗證被拒絕（HTTP 403）' : `本機工具回覆 HTTP ${response.status}`);
+        error.code = response.status === 403 ? 'authentication_failed' : 'connection_failed';
+        throw error;
+      }
       const {command} = await response.json();
       if (!command) { await sleep(500); continue; }
       let result;
@@ -139,7 +146,12 @@ async function poll() {
         error: error.code ? error.message : '擴充功能操作失敗，請確認工具分頁及網站登入。'}; }
       await chrome.storage.session.set({pendingResult: result});
     }
-  } catch { /* Desktop tool is normally offline. Alarm or popup will retry. */ }
+  } catch (error) {
+    const safeMessage = error instanceof TypeError ? 'Failed to fetch：無法連接本機工具；請確認工具已開啟連線診斷。'
+      : error.code ? error.message : stage === 'config' ? '無法讀取本機配對設定。' : '本機連線中斷或逾時。';
+    await chrome.storage.local.set({connectionStatus: {state: error.code || 'connection_failed', stage,
+      message: safeMessage, checkedAt: new Date().toISOString(), version: chrome.runtime.getManifest().version}});
+  }
   finally { polling = false; }
 }
 

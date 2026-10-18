@@ -55,6 +55,21 @@ class BridgeTests(unittest.TestCase):
         with urllib.request.urlopen(req, timeout=3) as response:
             self.assertIsNone(json.load(response)['command'])
 
+    def test_health_checks_authentication_without_delivering_work(self):
+        data = json.load(self.request('/health'))
+        self.assertEqual(data['protocol'], 1)
+        self.assertTrue(data['authenticated'])
+        self.assertNotIn('unit-test-secret', json.dumps(data))
+
+    def test_diagnostics_distinguish_rejected_token_from_no_connection(self):
+        self.assertEqual(self.bridge.diagnostics()['requests_received'], 0)
+        with self.assertRaises(urllib.error.HTTPError):
+            self.request(token='wrong')
+        diagnostics = self.bridge.diagnostics()
+        self.assertEqual(diagnostics['requests_received'], 1)
+        self.assertEqual(diagnostics['rejections']['token_mismatch'], 1)
+        self.assertNotIn('unit-test-secret', json.dumps(diagnostics))
+
 
 if __name__ == '__main__':
     unittest.main()

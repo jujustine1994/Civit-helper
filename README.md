@@ -52,7 +52,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\remove_schedule.ps1
 
 ## 紀錄與入口
 
-視窗提供「立即執行、登入／重新登入、檢查網站、查看 log、開啟擴充功能資料夾」。登入按鈕只在正常 Chrome 開啟 Civitai，使用者自行完成登入。
+視窗提供「立即執行、登入／重新登入、檢查網站、連線診斷、查看 log、開啟擴充功能資料夾」。登入按鈕只在正常 Chrome 開啟 Civitai，使用者自行完成登入。
+
+### 擴充功能未連線時
+
+0.2.1 起可使用純連線診斷，不開圖片視窗、不按愛心、不追蹤：
+
+1. 在Windows工具按「連線診斷」（舊視窗需關閉後重新開啟），或執行下方 `app.py doctor`。
+2. 在 `chrome://extensions` 的卡片按↻，確認版本為0.2.1或更新。
+3. 點Chrome右上角拼圖 → Civit Helper →「連線診斷／立即連接」。
+4. 成功時Windows工具會回報「擴充功能連線成功」；失敗時擴充功能顯示階段、HTTP狀態及安全的診斷文字，可複製給維護者。
+
+`runtime/connection-diagnostic.json` 保存Windows端診斷，區分完全沒有請求、配對遭拒、已連線但命令逾時。診斷不包含token、密碼或cookie。「連線成功」只代表通訊正常，不代表網站任務完成。
 
 文字 log：`runtime/logs/civit.log`，每日輪替、保留30份。當日進度與待確認操作：`runtime/state.db`。最新只讀診斷：`runtime/diagnostic.json`。啟動層錯誤：`runtime/launcher.log`。
 
@@ -64,6 +75,7 @@ Python：`%USERPROFILE%\venvs\CivitHelper\Scripts\python.exe`。
 
 ```powershell
 & "$env:USERPROFILE\venvs\CivitHelper\Scripts\python.exe" app.py status
+& "$env:USERPROFILE\venvs\CivitHelper\Scripts\python.exe" app.py doctor
 & "$env:USERPROFILE\venvs\CivitHelper\Scripts\python.exe" app.py inspect
 & "$env:USERPROFILE\venvs\CivitHelper\Scripts\python.exe" app.py run
 & "$env:USERPROFILE\venvs\CivitHelper\Scripts\python.exe" -m unittest discover -s tests -v

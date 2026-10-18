@@ -18,7 +18,7 @@ def output(value):
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Civit Helper')
     parser.add_argument('command', nargs='?', default='gui',
-                        choices=['gui', 'run', 'login', 'inspect', 'status', 'schedule-xml'])
+                        choices=['gui', 'run', 'login', 'inspect', 'doctor', 'status', 'schedule-xml'])
     parser.add_argument('--source', choices=['manual', 'scheduled'], default='manual')
     args = parser.parse_args(argv)
     if args.command == 'gui':
@@ -84,7 +84,12 @@ def main(argv=None):
             from civit_helper.remote_site import BridgeSite
             try:
                 ensure_extension_config()
-                if args.command == 'login':
+                if args.command == 'doctor':
+                    from civit_helper.diagnostics import check_connection
+                    with store.db:
+                        store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待連線診斷；請重新載入0.2.1擴充功能並按「立即連接」。此模式不操作網站。', run_id))
+                    result = check_connection()
+                elif args.command == 'login':
                     from civit_helper.login import open_daily_browser
                     open_daily_browser()
                     result = {'status': 'setup_required', 'message': '已開啟日常 Chrome 的 Civitai，請正常登入；載入擴充功能後按「檢查網站」。'}

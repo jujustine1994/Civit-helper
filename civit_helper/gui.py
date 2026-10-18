@@ -16,8 +16,8 @@ LABELS = {'running': '執行中', 'complete': '今日已完成', 'partial': '部
 def launch():
     root = tk.Tk()
     root.title('Civit Helper')
-    root.geometry('720x510')
-    root.minsize(680, 490)
+    root.geometry('800x530')
+    root.minsize(780, 510)
     root.configure(bg='#f4f6fa')
     style = ttk.Style(root)
     style.theme_use('clam')
@@ -55,7 +55,7 @@ def launch():
             stdout=stream, stderr=stream, creationflags=subprocess.CREATE_NO_WINDOW)
         detail.configure(text='已啟動。' + ('請在日常 Chrome 正常登入 Civitai。' if command == 'login' else '請確認日常 Chrome 已載入 Civit Helper；結果將自動更新。'))
 
-    for label, command in [('立即執行', 'run'), ('登入／重新登入', 'login'), ('檢查網站', 'inspect')]:
+    for label, command in [('立即執行', 'run'), ('登入／重新登入', 'login'), ('檢查網站', 'inspect'), ('連線診斷', 'doctor')]:
         button = ttk.Button(buttons, text=label, command=lambda cmd=command: start(cmd))
         button.pack(side='left', padx=(0, 8))
         controls.append(button)
