@@ -58,21 +58,18 @@ def main(argv=None):
             logging.info('run_id=%s started', run_id)
             from civit_helper.site import ChromeSite, LoginRequired, VerificationRequired
             try:
-                with ChromeSite(headed=args.command == 'login',
-                                seconds=1800 if args.command == 'login' else 1200) as site:
+                if args.command == 'login':
+                    from civit_helper.login import open_native_login
+                    message = '請在專用 Chrome 親自登入；成功後關閉這個專用 Chrome 視窗，工具才會檢查登入。'
+                    with store.db:
+                        store.db.execute('UPDATE runs SET message=? WHERE id=?', (message, run_id))
+                    logging.info(message)
+                    open_native_login()
+                with ChromeSite(headed=False, seconds=1200) as site:
                     if args.command == 'login':
-                        logging.info('等待使用者在專用 Chrome 完成登入；不需要提供密碼給工具。')
-                        while True:
-                            if site.page.is_closed():
-                                result = {'status': 'login_required', 'message': '登入視窗已關閉，可再次使用「登入／重新登入」。'}
-                                break
-                            try:
-                                account = site.account()
-                                store.bind(account)
-                                result = {'status': 'ready', 'message': '登入已保存；可按「檢查網站」或「立即執行」。'}
-                                break
-                            except (LoginRequired, VerificationRequired):
-                                site.page.wait_for_timeout(2000)
+                        account = site.account()
+                        store.bind(account)
+                        result = {'status': 'ready', 'message': '登入已保存；可按「檢查網站」或「立即執行」。'}
                     elif args.command == 'inspect':
                         diagnostic = site.inspect()
                         if diagnostic.get('logged_in'):

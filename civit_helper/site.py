@@ -12,6 +12,7 @@ from urllib.parse import quote, parse_qs, urlparse
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 from .state import RUNTIME
+from .core import RunWindowExpired
 
 BASE = 'https://civitai.red'
 
@@ -49,6 +50,12 @@ def reaction_state(data, target):
     return 'Heart' in data.get(str(target), [])
 
 
+def follow_state(data, target):
+    if not isinstance(data, list) or any(type(x) is not int for x in data):
+        raise SiteError('無法確認追蹤名單：網站回應格式已變更。')
+    return int(target) in data
+
+
 class ChromeSite:
     def __init__(self, *, headed=False, seconds=1200):
         self.headed = headed
@@ -58,6 +65,7 @@ class ChromeSite:
         self.seed = []
         self.feed_filters = {}
         self.account_id = None
+        self.before_write = lambda: True
         self.browser = None
         self.playwright = None
 
@@ -167,10 +175,7 @@ class ChromeSite:
         if kind == 'heart':
             return reaction_state(self.query('reaction.getMyImageReactions', {'imageIds': [int(target)]}), target)
         if kind == 'follow':
-            data = self.query('user.getFollowingUsers')
-            if not isinstance(data, list) or any(type(x) is not int for x in data):
-                raise SiteError('無法確認追蹤名單：網站回應格式已變更。')
-            return int(target) in data
+            return follow_state(self.query('user.getFollowingUsers'), target)
         raise ValueError('unknown action kind')
 
     def _creator_name(self, target):
@@ -181,17 +186,20 @@ class ChromeSite:
             self.usernames[target] = data['username']
         return self.usernames[target]
 
+    def _heart_button(self):
+        self.page.locator('button[aria-label="Heart reaction"], button[aria-label="Add reaction"]').first.wait_for(state='visible')
+        button = self.page.locator('button[aria-label="Heart reaction"]')
+        if button.count() == 0:
+            self.page.get_by_role('button', name='Add reaction', exact=True).click()
+        button.wait_for(state='visible')
+        return button
+
     def apply(self, kind, target):
         if self.state(kind, target) is not False:
             raise SiteError('目標已操作或狀態不明，拒絕再次點擊。')
         if kind == 'heart':
             self.navigate('/images/' + str(int(target)))
-            button = self.page.locator('button[aria-label="Heart reaction"]')
-            if button.count() == 0:
-                add = self.page.get_by_role('button', name='Add reaction', exact=True)
-                if add.count() == 1:
-                    add.click()
-            button.wait_for(state='visible')
+            button = self._heart_button()
             method = 'reaction.toggle'
         elif kind == 'follow':
             self.navigate('/user/' + quote(self._creator_name(target), safe=''))
@@ -205,6 +213,8 @@ class ChromeSite:
         # Recheck after navigating; the UI itself is optimistic and isn't proof.
         if self.state(kind, target) is not False:
             raise SiteError('操作前狀態已變更，已停止以避免取消既有操作。')
+        if not self.before_write():
+            raise RunWindowExpired()
         with self.page.expect_response(
                 lambda r: r.url.startswith(BASE + '/api/trpc/') and method in r.url.split('?')[0]
                 and r.request.method == 'POST', timeout=30000) as received:
@@ -278,19 +288,28 @@ class ChromeSite:
             result['account'] = self.account()
             result['logged_in'] = True
             following = self.query('user.getFollowingUsers')
-            result['following_readable'] = isinstance(following, list)
+            follow_state(following, result['account'])
+            result['following_readable'] = True
         except LoginRequired as exc:
             result.update(logged_in=False, message=str(exc))
         # Public feed validates source expansion even before first login.
         data = self.query('image.getInfinite', {**self.feed_filters, 'limit': 3, 'sort': 'Newest', 'period': 'AllTime', 'types': ['image']})
         batch = self._batch(data.get('items', []))
+        if not batch:
+            raise SiteError('只讀檢查沒有取得圖片候選，網站尚未就緒。')
         result['candidate_count'] = len(batch)
         if batch:
             self.navigate('/images/' + batch[0]['image'])
-            self.page.wait_for_timeout(1500)
+            self._heart_button()
             result['heart_button_count'] = self.page.locator('button[aria-label="Heart reaction"]').count()
             result['add_reaction_count'] = self.page.get_by_role('button', name='Add reaction', exact=True).count()
             if result.get('logged_in'):
                 result['heart_state_readable'] = type(self.state('heart', batch[0]['image'])) is bool
+            self.navigate('/user/' + quote(self._creator_name(batch[0]['author']), safe=''))
+            follow_button = self.page.get_by_role('button', name=re.compile(r'^(Follow(?: back)?|Unfollow)$', re.I))
+            follow_button.first.wait_for(state='visible')
+            result['follow_button_count'] = follow_button.count()
+            if result['follow_button_count'] != 1:
+                raise SiteError('作者頁面追蹤按鈕不唯一，無法安全執行。')
         result['write_actions_tested'] = False
         return result

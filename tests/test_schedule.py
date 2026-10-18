@@ -24,6 +24,12 @@ class ScheduleTests(unittest.TestCase):
         ns = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
         self.assertEqual(Path(root.find('.//t:WorkingDirectory', ns).text), Path('C:/A&B'))
 
+    def test_logon_trigger_scoped_to_same_user_as_principal(self):
+        root = ET.fromstring(task_xml(Path('C:/Tool'), Path('C:/Python/pythonw.exe'), user_sid='S-1-5-21-123'))
+        ns = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
+        self.assertEqual(root.find('.//t:LogonTrigger/t:UserId', ns).text, 'S-1-5-21-123')
+        self.assertEqual(root.find('.//t:Principal/t:UserId', ns).text, 'S-1-5-21-123')
+
 
 if __name__ == '__main__':
     unittest.main()

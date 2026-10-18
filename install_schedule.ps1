@@ -6,11 +6,6 @@ if (-not (Test-Path -LiteralPath $pythonPath)) { throw 'CivitHelper Python envir
 if ($LASTEXITCODE -ne 0) { throw 'Failed to generate task XML.' }
 $xmlPath = Join-Path $projectPath 'runtime\schedule.xml'
 [xml]$taskDocument = Get-Content -LiteralPath $xmlPath -Raw
-$ns = $taskDocument.DocumentElement.NamespaceURI
-$principal = $taskDocument.GetElementsByTagName('Principal', $ns)[0]
-$userId = $taskDocument.CreateElement('UserId', $ns)
-$userId.InnerText = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-[void]$principal.PrependChild($userId)
 $taskName = 'CivitHelper_Daily'
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($existing) {

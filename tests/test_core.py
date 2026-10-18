@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from civit_helper.state import Store, RunLock, BusyError, taipei_now
-from civit_helper.core import execute, automatic_allowed
+from civit_helper.core import execute, automatic_allowed, RunWindowExpired
 
 
 class FakeSite:
@@ -114,6 +114,20 @@ class CoreTests(unittest.TestCase):
                     pass
         with RunLock(p):
             pass
+
+    def test_midnight_during_navigation_prevents_click(self):
+        current = [self.now().replace(hour=23, minute=59, second=59)]
+        def navigate_then_click(kind, target):
+            current[0] = current[0] + timedelta(seconds=2)
+            if not self.site.before_write():
+                raise RunWindowExpired()
+            self.site.applied.append((kind, target))
+        self.site.apply = navigate_then_click
+        result = execute(self.store, self.site, now=lambda: current[0], seconds=30)
+        self.assertEqual(result['status'], 'partial')
+        self.assertFalse(self.site.applied)
+        self.assertFalse(self.store.pending())
+        self.assertEqual(self.store.progress('2026-10-18'), {'heart': 0, 'follow': 0})
 
 
 if __name__ == '__main__':

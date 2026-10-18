@@ -1,5 +1,5 @@
 import unittest
-from civit_helper.site import decode_trpc, reaction_state, SiteError, ChromeSite
+from civit_helper.site import decode_trpc, reaction_state, follow_state, SiteError, ChromeSite
 
 
 class SiteTests(unittest.TestCase):
@@ -30,6 +30,22 @@ class SiteTests(unittest.TestCase):
         site.state = lambda kind, target: None
         with self.assertRaises(SiteError):
             site.apply('follow', '42')
+
+    def test_following_state_is_strict(self):
+        self.assertTrue(follow_state([42, 43], '42'))
+        self.assertFalse(follow_state([43], '42'))
+        for invalid in ({}, [{'id': 42}], ['42'], [True]):
+            with self.assertRaises(SiteError):
+                follow_state(invalid, '42')
+
+    def test_inspect_invalid_following_does_not_report_ready(self):
+        site = object.__new__(ChromeSite)
+        site.headed = False
+        site.client_headers = {'x-client': 'web'}
+        site.account = lambda: '42'
+        site.query = lambda *args: {}
+        with self.assertRaises(SiteError):
+            site.inspect()
 
 
 if __name__ == '__main__':

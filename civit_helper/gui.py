@@ -52,7 +52,7 @@ def launch():
         state['child'] = subprocess.Popen(
             [sys.executable, str(ROOT / 'app.py'), command], cwd=ROOT,
             stdout=stream, stderr=stream, creationflags=subprocess.CREATE_NO_WINDOW)
-        detail.configure(text='已啟動。' + ('請在新開的專用 Chrome 視窗登入；成功後視窗會關閉。' if command == 'login' else '結果將自動更新。'))
+        detail.configure(text='已啟動。' + ('請在專用 Chrome 登入；成功後關閉這個專用視窗，工具才會檢查登入。' if command == 'login' else '結果將自動更新。'))
 
     for label, command in [('立即執行', 'run'), ('登入／重新登入', 'login'), ('檢查網站', 'inspect')]:
         button = ttk.Button(buttons, text=label, command=lambda cmd=command: start(cmd))

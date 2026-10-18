@@ -1,11 +1,19 @@
-from datetime import datetime, timedelta
+import csv
+import subprocess
+from datetime import datetime
 from xml.sax.saxutils import escape
 from .state import TAIPEI
 
 TASK_NAME = 'CivitHelper_Daily'
 
 
-def task_xml(project, pythonw):
+def task_xml(project, pythonw, user_sid=None):
+    if user_sid is None:
+        text = subprocess.check_output(['whoami', '/user', '/fo', 'csv', '/nh'],
+                                       creationflags=subprocess.CREATE_NO_WINDOW).decode(errors='replace')
+        user_sid = next(csv.reader([text.strip()]))[1]
+    if not user_sid.startswith('S-1-'):
+        raise ValueError('無法取得目前 Windows 使用者 SID。')
     first = datetime.now(TAIPEI).replace(hour=4, minute=0, second=0, microsecond=0)
     # Today's missed trigger is intentionally eligible for StartWhenAvailable.
     return f'''<?xml version="1.0" encoding="UTF-16"?>
@@ -17,9 +25,9 @@ def task_xml(project, pythonw):
       <StartBoundary>{first.isoformat()}</StartBoundary><Enabled>true</Enabled>
       <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
     </CalendarTrigger>
-    <LogonTrigger><Enabled>true</Enabled><Delay>PT2M</Delay></LogonTrigger>
+    <LogonTrigger><Enabled>true</Enabled><UserId>{escape(user_sid)}</UserId><Delay>PT2M</Delay></LogonTrigger>
   </Triggers>
-  <Principals><Principal id="User"><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Principals><Principal id="User"><UserId>{escape(user_sid)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>

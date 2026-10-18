@@ -5,6 +5,10 @@ import time
 from .state import TARGETS, TAIPEI, taipei_now
 
 
+class RunWindowExpired(RuntimeError):
+    """Raised only before sending a write, so its pending intent can be cleared."""
+
+
 def automatic_allowed(now):
     if now.tzinfo is not None:
         now = now.astimezone(TAIPEI)
@@ -22,6 +26,8 @@ def execute(store, site, *, now=taipei_now, seconds=1200):
 
     def expired():
         return now().date().isoformat() != day or time.monotonic() >= deadline
+
+    site.before_write = lambda: not expired()
 
     for original_day, kind, target in store.pending():
         if expired():
@@ -58,7 +64,11 @@ def execute(store, site, *, now=taipei_now, seconds=1200):
                 if expired():
                     return result('partial', '已達時間上限或跨日，保留進度等待補跑。')
                 store.prepare(day, kind, target)
-                site.apply(kind, target)
+                try:
+                    site.apply(kind, target)
+                except RunWindowExpired:
+                    store.discard_pending(kind, target)
+                    return result('partial', '點擊前已跨日或達時間上限，未送出操作，等待補跑。')
                 after = site.state(kind, target)
                 if after is not True:
                     return result('unconfirmed', '網站尚未確認成功，保留操作供下次核對。')
