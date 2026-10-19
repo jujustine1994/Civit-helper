@@ -83,4 +83,12 @@ Python：`%USERPROFILE%\venvs\CivitHelper\Scripts\python.exe`。
 
 舊專用 Chrome adapter 及登入函式暫留作測試參照，預設程式不再使用。`runtime/chrome-profile` 是舊測試資料，不是日常 Chrome。網站實際愛心、追蹤及任務計數，需載入擴充功能後登入實測；單元測試通過不等於網站任務已完成。
 
+### 0.2.2 資料格式修正與建置
+
+Civitai會混用superjson與devalue回應，0.2.2已加入標準devalue parser，同時處理圖片清單、狀態及成功回應。更新後在Chrome卡片按↻確認版本0.2.2；不必重新安裝或登入，權限不變。
+
+`extension/page.mjs` 是可直接載入的生成檔，不需使用者安裝Node套件。維護者修改 `extension/page_source.mjs` 後執行 `npm ci --ignore-scripts` 和 `npm run build`；建置會把parser包進序列化函式，保留 `DEVALUE-LICENSE.txt`，避免MAIN world依賴模組閉包。
+
+官方格式依據：[Civitai union transformer](https://github.com/civitai/civitai/blob/main/src/shared/utils/trpc-union-transformer.ts)。
+
 參照：[Chrome scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)、[alarms](https://developer.chrome.com/docs/extensions/reference/api/alarms)、[Civitai 官方原始碼](https://github.com/civitai/civitai)。

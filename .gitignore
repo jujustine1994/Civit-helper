@@ -4,3 +4,4 @@ __pycache__/
 runtime/
 .worktrees/
 extension/local-config.json
+node_modules/

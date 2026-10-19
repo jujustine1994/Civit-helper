@@ -1,0 +1,12 @@
+{
+  "name": "civit-helper-extension-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-extension.mjs"
+  },
+  "devDependencies": {
+    "devalue": "6.0.3",
+    "esbuild": "0.28.2"
+  }
+}
