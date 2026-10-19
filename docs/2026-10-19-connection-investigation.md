@@ -14,3 +14,7 @@
 - 這證明localhost可達、worker有定時輪詢；失敗點是目前執行中的舊程式沒有送來源標記，而Chrome對此GET也省略Origin。
 - 用戶截圖顯示0.2.0。0.2.1的worker會送X-Civit-Helper-Origin，因此需要在Chrome重新載入才套用；沒有放寬token、來源或Host驗證。
 - 尚未收到0.2.1的有效ping回應，不能宣稱已通過實際連線。需完成此步後再安排網站只讀檢查，不能把診斷成功等同每日任務完成。
+
+## 實測確認（07:04:18）
+
+用戶重新載入0.2.1後，run_id=23收到有效ping回覆：version=0.2.1、配對成功、authenticated=2、last_command=ping。診斷結果ready，website_actions=false。證實更新擴充功能後通訊正常；此前4筆invalid_origin屬更新前累積。未執行愛心或追蹤，網站操作與任務計數仍未實測。
