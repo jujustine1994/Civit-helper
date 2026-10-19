@@ -427,17 +427,17 @@ var CivitHelperPage = (() => {
       if (!Array.isArray(data) || data.some((x) => !Number.isInteger(x))) fail("SCHEMA", "\u7121\u6CD5\u78BA\u8A8D\u8FFD\u8E64\u72C0\u614B\u3002");
       return data.includes(Number(cmd.target));
     };
+    const imageButtons = (selector) => [...document.querySelectorAll(selector)].filter((button) => visible(button) && !button.closest('[id^="comment-"]'));
     const heartButton = async () => {
-      const select = () => [...document.querySelectorAll('button[aria-label="Heart reaction"],button[aria-label="Add reaction"]')].find(visible);
-      await waitFor(select);
-      let heart = [...document.querySelectorAll('button[aria-label="Heart reaction"]')].filter(visible);
+      await waitFor(() => imageButtons('button[aria-label="Heart reaction"],button[aria-label="Add reaction"]')[0]);
+      let heart = imageButtons('button[aria-label="Heart reaction"]');
       if (!heart.length) {
-        const add = [...document.querySelectorAll('button[aria-label="Add reaction"]')].filter(visible);
+        const add = imageButtons('button[aria-label="Add reaction"]');
         if (add.length !== 1) fail("AMBIGUOUS", "\u8868\u60C5\u5165\u53E3\u4E0D\u552F\u4E00\uFF0C\u505C\u6B62\u4EE5\u907F\u514D\u64CD\u4F5C\u932F\u8AA4\u3002");
         add[0].click();
       }
-      await waitFor(() => [...document.querySelectorAll('button[aria-label="Heart reaction"]')].find(visible));
-      heart = [...document.querySelectorAll('button[aria-label="Heart reaction"]')].filter(visible);
+      await waitFor(() => imageButtons('button[aria-label="Heart reaction"]')[0]);
+      heart = imageButtons('button[aria-label="Heart reaction"]');
       if (heart.length !== 1) fail("AMBIGUOUS", "\u611B\u5FC3\u6309\u9215\u4E0D\u552F\u4E00\uFF0C\u505C\u6B62\u4EE5\u907F\u514D\u64CD\u4F5C\u932F\u8AA4\u3002");
       return heart[0];
     };

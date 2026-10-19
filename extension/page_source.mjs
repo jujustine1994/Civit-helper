@@ -80,17 +80,19 @@ export async function execute(cmd) {
     if (!Array.isArray(data) || data.some(x => !Number.isInteger(x))) fail('SCHEMA', '無法確認追蹤狀態。');
     return data.includes(Number(cmd.target));
   };
+  // Comments (#comment-<id>) carry their own reaction buttons; only the image's own controls count.
+  const imageButtons = selector => [...document.querySelectorAll(selector)]
+    .filter(button => visible(button) && !button.closest('[id^="comment-"]'));
   const heartButton = async () => {
-    const select = () => [...document.querySelectorAll('button[aria-label="Heart reaction"],button[aria-label="Add reaction"]')].find(visible);
-    await waitFor(select);
-    let heart = [...document.querySelectorAll('button[aria-label="Heart reaction"]')].filter(visible);
+    await waitFor(() => imageButtons('button[aria-label="Heart reaction"],button[aria-label="Add reaction"]')[0]);
+    let heart = imageButtons('button[aria-label="Heart reaction"]');
     if (!heart.length) {
-      const add = [...document.querySelectorAll('button[aria-label="Add reaction"]')].filter(visible);
+      const add = imageButtons('button[aria-label="Add reaction"]');
       if (add.length !== 1) fail('AMBIGUOUS', '表情入口不唯一，停止以避免操作錯誤。');
       add[0].click(); // Opens controls only; does not react.
     }
-    await waitFor(() => [...document.querySelectorAll('button[aria-label="Heart reaction"]')].find(visible));
-    heart = [...document.querySelectorAll('button[aria-label="Heart reaction"]')].filter(visible);
+    await waitFor(() => imageButtons('button[aria-label="Heart reaction"]')[0]);
+    heart = imageButtons('button[aria-label="Heart reaction"]');
     if (heart.length !== 1) fail('AMBIGUOUS', '愛心按鈕不唯一，停止以避免操作錯誤。');
     return heart[0];
   };

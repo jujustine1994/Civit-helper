@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Civit Helper",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "連接本機 Civit Helper，僅操作工具建立的 Civitai 分頁。",
   "minimum_chrome_version": "120",
   "permissions": ["scripting", "storage", "alarms", "webRequest"],

@@ -118,6 +118,46 @@ class ExtensionTests(unittest.TestCase):
             finally:
                 browser.close()
 
+    def test_comment_reaction_buttons_do_not_make_image_heart_ambiguous(self):
+        # Real image pages also render Heart/Add reaction buttons inside each comment (#comment-<id>).
+        source = (ROOT / 'extension/page.mjs').read_text(encoding='utf-8')
+        markup = ('<main><div class="image"><button aria-label="Add reaction">+</button>'
+                  '<button id="image-heart" aria-label="Heart reaction">Heart 70</button></div>'
+                  '<div id="comment-1"><button aria-label="Add reaction">+</button>'
+                  '<button class="comment-heart" aria-label="Heart reaction">Heart 10</button>'
+                  '<div id="comment-2"><button aria-label="Heart reaction">Heart 1</button></div></div></main>')
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(channel='chrome', headless=True)
+            try:
+                page = browser.new_page()
+                page.route('https://civitai.red/**', lambda route: route.fulfill(body=markup, content_type='text/html'))
+                page.goto('https://civitai.red/images/42')
+                page.evaluate('''() => {
+                  window.mutationsSent = 0;
+                  window.fetch = async (input, init) => {
+                    const url = String(input);
+                    let value;
+                    if (url.includes('/api/auth/session')) value = {user:{id:7}};
+                    else if (url.includes('getMyImageReactions')) value = {result:{data:'[{}]'}};
+                    else { window.mutationsSent++; value = {result:{data:'["created"]'}}; }
+                    return new Response(JSON.stringify(value), {status:200,headers:{'content-type':'application/json'}});
+                  };
+                  document.querySelector('#image-heart').onclick = () => fetch('/api/trpc/reaction.toggle', {
+                    method:'POST',body:JSON.stringify({json:{entityType:'image',entityId:42,reaction:'Heart'}})
+                  }).catch(()=>{});
+                  for (const b of document.querySelectorAll('[id^="comment-"] button')) b.onclick = () => fetch('/api/trpc/reaction.toggle', {
+                    method:'POST',body:JSON.stringify({json:{entityType:'comment',entityId:1,reaction:'Heart'}})
+                  }).catch(()=>{});
+                }''')
+                page.add_script_tag(content=source.replace('export async function runPageCommand', 'window.runPageCommand = async function'))
+                result = page.evaluate("runPageCommand({op:'action',kind:'heart',target:'42',accountId:'7',expiresAt:Date.now()+5000})")
+                self.assertTrue(result['ok'], result)
+                self.assertEqual(page.evaluate('window.mutationsSent'), 1)
+                probe = page.evaluate("runPageCommand({op:'probeHeart',expiresAt:Date.now()+5000})")
+                self.assertTrue(probe['ok'], probe)
+            finally:
+                browser.close()
+
 
 if __name__ == '__main__':
     unittest.main()
