@@ -29,6 +29,14 @@ async function waitLoaded(tabId) {
   fail('LOAD_TIMEOUT', '工具分頁載入逾時，請檢查網站。');
 }
 
+// Chrome on Windows may ignore state:'minimized' at creation or restore the window on navigation.
+async function keepMinimized(windowId) {
+  try {
+    const current = await chrome.windows.get(windowId);
+    if (current.state !== 'minimized') await chrome.windows.update(windowId, {state: 'minimized', focused: false});
+  } catch { /* Ownership checks elsewhere decide whether the run continues. */ }
+}
+
 async function ownedTab() {
   const {ownedTab: saved} = await chrome.storage.session.get('ownedTab');
   if (!saved) fail('TAB_CLOSED', '工具分頁尚未建立，請重新執行。');
@@ -55,6 +63,7 @@ async function initialize() {
     const tab = taskWindow.tabs?.[0];
     if (!tab?.id) fail('WINDOW_FAILED', '無法建立工具專用最小化視窗。');
     ownedId = tab.id;
+    await keepMinimized(taskWindow.id);
     await waitLoaded(tab.id);
     const marker = crypto.randomUUID();
     await chrome.scripting.executeScript({target: {tabId: tab.id},
@@ -66,6 +75,7 @@ async function initialize() {
   await chrome.tabs.update(tab.id, {url: BASE + '/images'});
   await chrome.tabs.reload(tab.id);
   await waitLoaded(tab.id);
+  await keepMinimized(tab.windowId);
   const until = Date.now() + 15000;
   while (!metadata && Date.now() < until) await sleep(250);
   if (!metadata || !('browsingLevel' in metadata.filters)) fail('FEED_MISSING', '尚未取得網站圖片來源，請確認登入或安全驗證。');
@@ -77,6 +87,7 @@ async function navigate(path) {
   const {tab} = await ownedTab();
   await chrome.tabs.update(tab.id, {url: BASE + path, active: false});
   await waitLoaded(tab.id);
+  await keepMinimized(tab.windowId);
   await ownedTab();
 }
 

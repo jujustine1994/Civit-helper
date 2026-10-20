@@ -1,6 +1,6 @@
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 from civit_helper.core import RunWindowExpired
 from civit_helper.remote_site import BridgeSite
 
@@ -36,6 +36,18 @@ class RemoteSiteTests(unittest.TestCase):
         with self.assertRaises(RunWindowExpired):
             site.apply('heart', '42')
         site.bridge.command.assert_not_called()
+
+    def test_only_window_created_during_init_is_minimized(self):
+        windows = [[1], [1, 2]]  # 1 = user's existing window, 2 = tool window from init
+        bridge = MagicMock()
+        bridge.command.side_effect = lambda op, **kw: (time.sleep(0.5), {'headers': {}, 'filters': {'browsingLevel': 1}})[1]
+        with patch('civit_helper.remote_site.Bridge', return_value=bridge), \
+                patch('civit_helper.remote_site.chrome_windows', side_effect=lambda: windows[0] if len(windows) == 1 else windows.pop(0)), \
+                patch('civit_helper.remote_site.minimize_windows') as minimize:
+            site = BridgeSite().__enter__()
+        self.assertEqual(site.tool_windows, [2])
+        self.assertTrue(all(1 not in call.args[0] for call in minimize.call_args_list))
+        minimize.assert_called_with([2])
 
 
 if __name__ == '__main__':

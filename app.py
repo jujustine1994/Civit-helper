@@ -82,13 +82,15 @@ def main(argv=None):
             from civit_helper.site import LoginRequired, VerificationRequired
             from civit_helper.bridge import BridgeError, ensure_extension_config
             from civit_helper.remote_site import BridgeSite
+            from civit_helper.daily_chrome import DailyChrome
             try:
                 ensure_extension_config()
                 if args.command == 'doctor':
                     from civit_helper.diagnostics import check_connection
                     with store.db:
                         store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待連線診斷；請重新載入0.2.1擴充功能並按「立即連接」。此模式不操作網站。', run_id))
-                    result = check_connection()
+                    with DailyChrome():
+                        result = check_connection()
                 elif args.command == 'login':
                     from civit_helper.login import open_daily_browser
                     open_daily_browser()
@@ -96,7 +98,7 @@ def main(argv=None):
                 else:
                     with store.db:
                         store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待日常 Chrome 擴充功能連線，請確認已載入 Civit Helper。', run_id))
-                    with BridgeSite(seconds=1200) as site:
+                    with DailyChrome(), BridgeSite(seconds=1200) as site:
                         if args.command == 'inspect':
                             diagnostic = site.inspect()
                             if diagnostic.get('logged_in'):

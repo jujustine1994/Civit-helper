@@ -1,20 +1,44 @@
 import json
+import threading
 import time
 from urllib.parse import quote
 
 from .bridge import Bridge, BridgeError
 from .core import RunWindowExpired
+from .daily_chrome import chrome_windows, minimize_windows
 from .site import ChromeSite, SiteError, LoginRequired, VerificationRequired, decode_trpc, follow_state
 from .state import taipei_now
 
 
 class BridgeSite(ChromeSite):
     """Same core interface, implemented by the extension in the user's Chrome."""
+    tool_windows = ()
+
     def __enter__(self):
         self.bridge = Bridge()
         self.bridge.__enter__()
+        self.tool_windows = []
         try:
-            data = self.bridge.command('init', timeout=110)
+            # Chrome ignores the extension's minimized state on Windows (seen live 2026-10-20),
+            # so the window that appears during init is minimized from here instead.
+            before = set(chrome_windows())
+            done = threading.Event()
+
+            def watch():
+                while not done.wait(0.2):
+                    for hwnd in chrome_windows():
+                        if hwnd not in before and hwnd not in self.tool_windows:
+                            self.tool_windows.append(hwnd)
+                    minimize_windows(self.tool_windows)
+
+            watcher = threading.Thread(target=watch, daemon=True)
+            watcher.start()
+            try:
+                data = self.bridge.command('init', timeout=110)
+            finally:
+                done.set()
+                watcher.join(timeout=2)
+            minimize_windows(self.tool_windows)
             self.client_headers = data['headers']
             self.feed_filters = data['filters']
             if 'browsingLevel' not in self.feed_filters:
@@ -59,6 +83,8 @@ class BridgeSite(ChromeSite):
             self.bridge.command('navigate', path=path)
         except BridgeError as exc:
             self._translate(exc)
+        finally:
+            minimize_windows(self.tool_windows)
 
     @staticmethod
     def _translate(exc):
@@ -86,6 +112,8 @@ class BridgeSite(ChromeSite):
             result = self.bridge.command('action', timeout=110, **args)
         except BridgeError as exc:
             self._translate(exc)
+        finally:
+            minimize_windows(self.tool_windows)
         if not isinstance(result, dict) or result.get('accepted') is not True:
             raise SiteError('未收到可靠的操作成功確認，進度保留。')
 

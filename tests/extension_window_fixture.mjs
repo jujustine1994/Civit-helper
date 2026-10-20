@@ -7,6 +7,8 @@ let closedWindows = [];
 let closedTabs = [];
 let requestObserver;
 let options;
+let windowState = 'normal';  // Chrome ignored the requested minimized state.
+let windowUpdates = [];
 globalThis.sessionStorage = {getItem: () => marker, setItem: (key, value) => {marker = value;}};
 globalThis.chrome = {
   webRequest: {onBeforeSendHeaders: {addListener: fn => {requestObserver = fn;}}},
@@ -17,6 +19,8 @@ globalThis.chrome = {
   }},
   windows: {
     create: async value => {options = value; return {id: 100, tabs: [{id: 200, windowId: 100}]};},
+    get: async id => ({id, state: windowState}),
+    update: async (id, value) => {windowUpdates.push([id, value]); windowState = value.state;},
     remove: async id => closedWindows.push(id)
   },
   tabs: {
@@ -38,6 +42,10 @@ await dispatch(cmd('init'));
 assert.equal(options.state, 'minimized');
 assert.equal(options.focused, false);
 assert.equal(options.type, 'normal');
+assert.deepEqual(windowUpdates, [[100, {state: 'minimized', focused: false}]]);
+windowState = 'normal';  // Simulate Chrome restoring the window during navigation.
+await dispatch({...cmd('navigate'), path: '/images/42'});
+assert.equal(windowUpdates.length, 2);
 await dispatch(cmd('close'));
 assert.deepEqual(closedWindows, [100]);
 assert.deepEqual(closedTabs, []);

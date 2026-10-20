@@ -1,3 +1,15 @@
+規則檔: windows-tool.md
+
+> **AI 注意（2026-10-19）：本專案建立時未套用 windows-tool 規則，以下差異是既有現況，不是錯誤。**除錯時以本 README 與程式碼為準，不要自行「修正」成規則檔寫法；要調整結構需先問使用者並逐項進行。
+>
+> | 規則檔要求 | 本專案現況 |
+> |---|---|
+> | 薄 BAT ＋ `launcher.ps1`、首次自動用 uv 建 venv | 雙擊 `launch.vbs`（pythonw，無主控台視窗）；venv `%USERPROFILE%\venvs\CivitHelper` 為手動建立 |
+> | `logs/app.log` 單檔累積、英文訊息 | `runtime/logs/civit.log` 每日輪替保留 30 份、中文訊息 |
+> | 原始碼 `src/`、文件 `docs/`（ARCHITECTURE／CHANGELOG／TODO） | 原始碼 `civit_helper/`、入口 `app.py` 在根目錄；`TODO.md` 在根目錄，`docs/` 只有個別調查紀錄 |
+> | README 套模板 | 未套模板 |
+> | tkinter UI pattern（skeleton／pattern_*.py） | `civit_helper/gui.py` 是 tkinter，但未依 pattern 庫建立 |
+
 # Civit Helper
 
 Windows 小工具搭配日常 Chrome 擴充功能，每日台灣時間 **04:00** 執行 50 個愛心及追蹤 3 位新作者。使用日常 Chrome 的登入環境，另外開獨立、最小化的工具視窗，結束後關閉；不加入既有視窗的分頁列，不控制滑鼠鍵盤。
@@ -24,7 +36,7 @@ Windows 小工具搭配日常 Chrome 擴充功能，每日台灣時間 **04:00**
 - 手動「立即執行」直接開始，不倒數。
 - 通知顯示失敗、倒數跨日或台灣時間未到04:00：不執行。
 
-時間包含 `+08:00`，不依賴 Windows 時區。使用目前 Windows 帳號的登入工作階段，不保存 Windows 密碼、不要求管理員權限。關機、登出或休眠時無法執行，錯過04:00就等隔天，不主動喚醒電腦。日常 Chrome 必須已開啟並載入擴充功能；若未連線會明確記錄，需補跑請手動啟動。
+時間包含 `+08:00`，不依賴 Windows 時區。使用目前 Windows 帳號的登入工作階段，不保存 Windows 密碼、不要求管理員權限。關機、登出或休眠時無法執行，錯過04:00就等隔天，不主動喚醒電腦。Chrome 沒開時，執行（排程、手動、檢查網站、連線診斷）會自動以裝有擴充功能的設定檔啟動 Chrome（一般啟動、不帶除錯參數，自動指定設定檔以跳過多設定檔選擇畫面），啟動視窗與工具視窗都由 Windows 端強制最小化；結束後只關閉工具啟動、且仍維持最小化的視窗。Chrome 本來就開著則不另開。若未連線會明確記錄，需補跑請手動啟動。
 
 安裝／更新排程：
 
