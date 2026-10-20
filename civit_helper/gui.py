@@ -47,11 +47,27 @@ def launch():
         if state['child'] and state['child'].poll() is None:
             messagebox.showinfo('執行中', '請等目前工作結束；登入視窗需要由你親自完成登入。')
             return
+        extra = []
+        if command == 'run':
+            store = Store()
+            try:
+                data = store.status()
+            finally:
+                store.close()
+            done, goal = data['progress'], data['targets']
+            if data['pending'] == 0 and all(done[k] >= goal[k] for k in goal):
+                if not messagebox.askyesno(
+                        '今天已執行過',
+                        f'今天已完成：愛心 {done["heart"]}、追蹤 {done["follow"]}。\n\n'
+                        '要再執行一整輪嗎？（再按 50 個新愛心、追蹤 3 位新作者）\n'
+                        '04:00 的排程不受影響，照常執行。', parent=root):
+                    return
+                extra = ['--extra-round']
         RUNTIME.mkdir(exist_ok=True)
         stream = open(RUNTIME / 'launcher.log', 'ab')
         state['log'] = stream
         state['child'] = subprocess.Popen(
-            [sys.executable, str(ROOT / 'app.py'), command], cwd=ROOT,
+            [sys.executable, str(ROOT / 'app.py'), command] + extra, cwd=ROOT,
             stdout=stream, stderr=stream, creationflags=subprocess.CREATE_NO_WINDOW)
         detail.configure(text='已啟動。' + ('請在日常 Chrome 正常登入 Civitai。' if command == 'login' else '請確認日常 Chrome 已載入 Civit Helper；結果將自動更新。'))
 
@@ -121,7 +137,8 @@ def launch():
             finally:
                 store.close()
             counts = data['progress']
-            progress.configure(text=f'❤️ 愛心 {counts["heart"]} / 50     ·     追蹤 {counts["follow"]} / 3')
+            goal = data['targets']
+            progress.configure(text=f'❤️ 愛心 {counts["heart"]} / {goal["heart"]}     ·     追蹤 {counts["follow"]} / {goal["follow"]}')
             date_label.configure(text=f'台灣日期：{data["day"]}   ·   待確認操作：{data["pending"]}')
             run = data['last_run']
             status.configure(text=LABELS.get(run['status'], run['status']) if run else '請先在日常 Chrome 載入擴充功能並登入 Civitai。')

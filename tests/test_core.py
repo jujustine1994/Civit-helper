@@ -48,6 +48,17 @@ class CoreTests(unittest.TestCase):
         self.run_work()
         self.assertEqual(len(self.site.applied), 53)
 
+    def test_extra_round_adds_one_full_round_on_new_targets(self):
+        self.site = FakeSite(count=120)
+        self.assertEqual(self.run_work()['status'], 'complete')
+        self.assertEqual(self.store.add_round('2026-10-18'), {'heart': 100, 'follow': 6})
+        self.assertEqual(self.run_work()['status'], 'complete')
+        self.assertEqual(self.store.progress('2026-10-18'), {'heart': 100, 'follow': 6})
+        self.assertEqual(len(self.site.applied), 106)
+        self.assertEqual(len(set(self.site.applied)), 106)  # never the same image or author twice
+        # The next day is back to the default goal (04:00 schedule unaffected).
+        self.assertEqual(self.store.day_targets('2026-10-19'), {'heart': 50, 'follow': 3})
+
     def test_resume_partial_and_skip_existing_reactions(self):
         self.store.bind('123')
         for i in range(20):

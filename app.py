@@ -20,6 +20,8 @@ def main(argv=None):
     parser.add_argument('command', nargs='?', default='gui',
                         choices=['gui', 'run', 'login', 'inspect', 'doctor', 'status', 'schedule-xml'])
     parser.add_argument('--source', choices=['manual', 'scheduled'], default='manual')
+    parser.add_argument('--extra-round', action='store_true',
+                        help='manual only: when today is complete, do another full 50/3 round')
     args = parser.parse_args(argv)
     if args.command == 'gui':
         from civit_helper.gui import launch
@@ -50,12 +52,17 @@ def main(argv=None):
             setup_logging(args.source + '/' + args.command)
             store = Store()
             day = taipei_now().date().isoformat()
-            if (args.command == 'run' and not store.pending()
-                    and all(store.progress(day)[k] >= n for k, n in TARGETS.items())):
+            done_today = (args.command == 'run' and not store.pending()
+                          and all(store.progress(day)[k] >= n for k, n in store.day_targets(day).items()))
+            if done_today and args.extra_round and args.source == 'manual':
+                targets = store.add_round(day)
+                logging.info('extra round requested; today targets=%s', targets)
+            elif done_today:
                 # Record it: otherwise the window keeps showing the previous diagnostic and
                 # pressing 「立即執行」 looks like it did nothing.
-                counts = store.progress(day)
-                message = f'今天已完成（愛心 {counts["heart"]}/50、追蹤 {counts["follow"]}/3），不需要再執行。'
+                counts, targets = store.progress(day), store.day_targets(day)
+                message = (f'今天已完成（愛心 {counts["heart"]}/{targets["heart"]}、'
+                           f'追蹤 {counts["follow"]}/{targets["follow"]}），不需要再執行。')
                 run_id = store.start_run(args.source + '/' + args.command)
                 store.end_run(run_id, 'complete', message)
                 logging.info('run_id=%s already complete today; nothing to do', run_id)

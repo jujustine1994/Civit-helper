@@ -1,7 +1,7 @@
 """Human-readable run history (runtime/執行紀錄.txt); civit.log stays the technical log for AI/debugging."""
 from datetime import datetime
 
-from .state import RUNTIME, TARGETS
+from .state import RUNTIME
 
 HISTORY_FILE = RUNTIME / '執行紀錄.txt'
 SOURCES = {'scheduled': '排程', 'manual': '手動'}
@@ -25,7 +25,8 @@ def row_fields(run):
         'result': RESULTS.get(run['status'], run['status']),
         'heart': f"+{run['added']['heart']}",
         'follow': f"+{run['added']['follow']}",
-        'day': f"{total['heart']}/{TARGETS['heart']}、{total['follow']}/{TARGETS['follow']}",
+        # Plain counts: a later extra round raises the goal, which would make old rows read 50/100.
+        'day': f"{total['heart']}、{total['follow']}",
         'duration': duration(run['started'], run['ended']),
         # Success needs no explanation; failures keep the reason the tool recorded.
         'note': '' if run['status'] == 'complete' else run['message'],

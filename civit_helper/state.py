@@ -100,6 +100,19 @@ class Store:
             result[kind] = count
         return result
 
+    def day_targets(self, day):
+        """Daily goal; raised by an extra manual round, otherwise the default 50/3."""
+        row = self.db.execute('SELECT value FROM metadata WHERE key=?', ('targets:' + day,)).fetchone()
+        return json.loads(row[0]) if row else dict(TARGETS)
+
+    def add_round(self, day):
+        """One more full round on top of what is already confirmed today."""
+        done = self.progress(day)
+        targets = {kind: max(done[kind], self.day_targets(day)[kind]) + n for kind, n in TARGETS.items()}
+        with self.db:
+            self.db.execute('INSERT OR REPLACE INTO metadata VALUES (?,?)', ('targets:' + day, json.dumps(targets)))
+        return targets
+
     def seen(self, kind, target):
         return self.db.execute('SELECT 1 FROM actions WHERE kind=? AND target=?',
                                (kind, str(target))).fetchone() is not None
@@ -165,5 +178,6 @@ class Store:
         row = self.db.execute('SELECT started,ended,source,status,message FROM runs ORDER BY id DESC LIMIT 1').fetchone()
         return {'day': taipei_now().date().isoformat(),
                 'progress': self.progress(taipei_now().date().isoformat()),
+                'targets': self.day_targets(taipei_now().date().isoformat()),
                 'pending': len(self.pending()),
                 'last_run': dict(zip(('started', 'ended', 'source', 'status', 'message'), row)) if row else None}
