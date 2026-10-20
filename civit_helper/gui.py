@@ -61,10 +61,41 @@ def launch():
         controls.append(button)
 
     def view_logs():
+        from .history import row_fields
         window = tk.Toplevel(root)
         window.title('Civit Helper · 執行紀錄')
-        window.geometry('960x560')
-        text = tk.Text(window, wrap='word', font=('Consolas', 10))
+        window.geometry('1040x560')
+        tabs = ttk.Notebook(window)
+        tabs.pack(fill='both', expand=True)
+
+        # Human view: one row per task run.
+        summary = ttk.Frame(tabs, padding=8)
+        tabs.add(summary, text='執行紀錄')
+        columns = [('time', '時間', 130), ('source', '方式', 60), ('result', '結果', 110), ('heart', '這次愛心', 75),
+                   ('follow', '這次追蹤', 75), ('day', '當日累計', 110), ('duration', '耗時', 85), ('note', '說明', 360)]
+        table = ttk.Treeview(summary, columns=[c for c, _, _ in columns], show='headings')
+        for key, title, width in columns:
+            table.heading(key, text=title)
+            table.column(key, width=width, anchor='w' if key == 'note' else 'center', stretch=key == 'note')
+        scroll = ttk.Scrollbar(summary, orient='vertical', command=table.yview)
+        table.configure(yscrollcommand=scroll.set)
+        table.pack(side='left', fill='both', expand=True)
+        scroll.pack(side='right', fill='y')
+        store = Store()
+        try:
+            runs = store.history()
+        finally:
+            store.close()
+        for run in runs:
+            fields = row_fields(run)
+            table.insert('', 'end', values=[fields[key] for key, _, _ in columns])
+        if not runs:
+            table.insert('', 'end', values=['尚無執行紀錄'] + [''] * (len(columns) - 1))
+
+        # Technical view for AI / debugging.
+        technical = ttk.Frame(tabs)
+        tabs.add(technical, text='技術 log（除錯用）')
+        text = tk.Text(technical, wrap='word', font=('Consolas', 10))
         text.pack(fill='both', expand=True)
         path = RUNTIME / 'logs' / 'civit.log'
         content = path.read_text(encoding='utf-8', errors='replace')[-60000:] if path.exists() else '尚無執行紀錄。'
@@ -72,7 +103,7 @@ def launch():
         text.configure(state='disabled')
         text.see('end')
 
-    ttk.Button(frame, text='查看 log 紀錄', command=view_logs).pack(anchor='w', pady=(12, 0))
+    ttk.Button(frame, text='查看執行紀錄', command=view_logs).pack(anchor='w', pady=(12, 0))
     def extension_folder():
         from .bridge import ensure_extension_config
         ensure_extension_config()

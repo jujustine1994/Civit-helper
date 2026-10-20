@@ -41,10 +41,19 @@ class RemoteSiteTests(unittest.TestCase):
         windows = [[1], [1, 2]]  # 1 = user's existing window, 2 = tool window from init
         bridge = MagicMock()
         bridge.command.side_effect = lambda op, **kw: (time.sleep(0.5), {'headers': {}, 'filters': {'browsingLevel': 1}})[1]
+        order = []
+        bridge.__enter__.side_effect = lambda: order.append('bridge')
+        chrome = MagicMock()
+        chrome.__enter__.side_effect = lambda: order.append('chrome')
         with patch('civit_helper.remote_site.Bridge', return_value=bridge), \
+                patch('civit_helper.remote_site.DailyChrome', return_value=chrome), \
                 patch('civit_helper.remote_site.chrome_windows', side_effect=lambda: windows[0] if len(windows) == 1 else windows.pop(0)), \
                 patch('civit_helper.remote_site.minimize_windows') as minimize:
             site = BridgeSite().__enter__()
+            site.__exit__(None, None, None)
+        # Chrome must start after the bridge listens, or the extension waits ~30 s for an alarm.
+        self.assertEqual(order, ['bridge', 'chrome'])
+        chrome.__exit__.assert_called_once()
         self.assertEqual(site.tool_windows, [2])
         self.assertTrue(all(1 not in call.args[0] for call in minimize.call_args_list))
         minimize.assert_called_with([2])

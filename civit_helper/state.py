@@ -138,6 +138,29 @@ class Store:
             self.db.execute('UPDATE runs SET ended=?,status=?,message=? WHERE id=?',
                             (taipei_now().isoformat(), status, message, run_id))
 
+    def history(self, limit=200):
+        """Task runs only (not doctor/inspect/login), newest first, with actions confirmed during each run."""
+        rows = self.db.execute(
+            "SELECT id,started,ended,source,status,message FROM runs WHERE source LIKE '%/run' ORDER BY id DESC LIMIT ?",
+            (limit,)).fetchall()
+        result = []
+        for run_id, started, ended, source, status, message in rows:
+            counts = dict.fromkeys(TARGETS, 0)
+            total = dict.fromkeys(TARGETS, 0)
+            if ended:
+                for kind, count in self.db.execute(
+                        "SELECT kind,COUNT(*) FROM actions WHERE status='confirmed' AND confirmed>=? AND confirmed<=? GROUP BY kind",
+                        (started, ended)):
+                    counts[kind] = count
+            # Day total as it stood when this run ended, not the day's final total.
+            for kind, count in self.db.execute(
+                    "SELECT kind,COUNT(*) FROM actions WHERE day=? AND status='confirmed' AND confirmed<=? GROUP BY kind",
+                    (started[:10], ended or started)):
+                total[kind] = count
+            result.append({'id': run_id, 'started': started, 'ended': ended, 'source': source.split('/')[0],
+                           'status': status, 'message': message, 'added': counts, 'day_total': total})
+        return result
+
     def status(self):
         row = self.db.execute('SELECT started,ended,source,status,message FROM runs ORDER BY id DESC LIMIT 1').fetchone()
         return {'day': taipei_now().date().isoformat(),

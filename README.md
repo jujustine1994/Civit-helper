@@ -77,7 +77,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\remove_schedule.ps1
 
 `runtime/connection-diagnostic.json` 保存Windows端診斷，區分完全沒有請求、配對遭拒、已連線但命令逾時。診斷不包含token、密碼或cookie。「連線成功」只代表通訊正常，不代表網站任務完成。
 
-文字 log：`runtime/logs/civit.log`，每日輪替、保留30份。當日進度與待確認操作：`runtime/state.db`。最新只讀診斷：`runtime/diagnostic.json`。啟動層錯誤：`runtime/launcher.log`。
+給人看的執行紀錄：視窗按「查看執行紀錄」，或開 `runtime/執行紀錄.txt`；每次執行一行，列時間、排程／手動、結果、這次愛心與追蹤數、當日累計、耗時，失敗才寫原因。今天已完成時按「立即執行」會記一筆「今天已完成，不需要再執行」。
+技術 log（給 AI／除錯）：`runtime/logs/civit.log`，每日輪替、保留30份。當日進度與待確認操作：`runtime/state.db`。最新只讀診斷：`runtime/diagnostic.json`。啟動層錯誤：`runtime/launcher.log`。
 
 關閉 Windows 工具主視窗不會取消已開始的工作；要取消尚未開始的排程，請關閉獨立的3分鐘倒數通知。相同時間只能有一個工作。
 

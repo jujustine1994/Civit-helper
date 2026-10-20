@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .bridge import Bridge, BridgeError
 from .core import RunWindowExpired
-from .daily_chrome import chrome_windows, minimize_windows
+from .daily_chrome import DailyChrome, chrome_windows, minimize_windows
 from .site import ChromeSite, SiteError, LoginRequired, VerificationRequired, decode_trpc, follow_state
 from .state import taipei_now
 
@@ -18,7 +18,12 @@ class BridgeSite(ChromeSite):
         self.bridge = Bridge()
         self.bridge.__enter__()
         self.tool_windows = []
+        self.chrome = None
         try:
+            # Start Chrome only after the bridge listens, so the extension's onStartup poll
+            # connects at once instead of waiting ~30 s for the next alarm.
+            self.chrome = DailyChrome()
+            self.chrome.__enter__()
             # Chrome ignores the extension's minimized state on Windows (seen live 2026-10-20),
             # so the window that appears during init is minimized from here instead.
             before = set(chrome_windows())
@@ -55,7 +60,11 @@ class BridgeSite(ChromeSite):
             import logging
             logging.warning('未能確認工具最小化視窗已關閉；未操作日常其他視窗。')
         finally:
-            self.bridge.__exit__()
+            try:
+                if self.chrome:
+                    self.chrome.__exit__(*args)
+            finally:
+                self.bridge.__exit__()
 
     def _get_json(self, path, params=None, headers=None):
         self._budget()

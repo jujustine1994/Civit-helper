@@ -158,9 +158,10 @@ export async function poll() {
       await chrome.storage.session.set({pendingResult: result});
     }
   } catch (error) {
-    const safeMessage = error instanceof TypeError ? 'Failed to fetch：無法連接本機工具；請確認工具已開啟連線診斷。'
+    // The local tool only listens while a job runs, so a refused fetch while idle is normal.
+    const safeMessage = error instanceof TypeError ? '目前沒有執行中的工作（本機工具只在執行或診斷時連線，屬正常）。'
       : error.code ? error.message : stage === 'config' ? '無法讀取本機配對設定。' : '本機連線中斷或逾時。';
-    await chrome.storage.local.set({connectionStatus: {state: error.code || 'connection_failed', stage,
+    await chrome.storage.local.set({connectionStatus: {state: error instanceof TypeError ? 'idle' : error.code || 'connection_failed', stage,
       message: safeMessage, checkedAt: new Date().toISOString(), version: chrome.runtime.getManifest().version}});
   }
   finally { polling = false; }

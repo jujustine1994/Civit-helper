@@ -1,12 +1,13 @@
 import json
 from .bridge import Bridge, BridgeError
+from .daily_chrome import DailyChrome
 from .state import RUNTIME, taipei_now
 
 
 def check_connection(timeout=180):
     """Only health/ping traffic; never creates tabs or touches website data."""
     report = {'checked_at': taipei_now().isoformat(), 'website_actions': False}
-    with Bridge() as bridge:
+    with Bridge() as bridge, DailyChrome():  # Chrome after the bridge listens (see BridgeSite).
         try:
             pong = bridge.command('ping', timeout=timeout)
             if not isinstance(pong, dict) or not isinstance(pong.get('version'), str):

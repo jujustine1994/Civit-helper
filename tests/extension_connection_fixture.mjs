@@ -17,9 +17,10 @@ globalThis.fetch = async url => {
 };
 const {poll} = await import('../extension/worker.js');
 await poll();
-assert.equal(local.connectionStatus.state, 'connection_failed');
+// Tool not listening = no job running; reported as normal idle, not as a failure.
+assert.equal(local.connectionStatus.state, 'idle');
 assert.equal(local.connectionStatus.stage, 'connect');
-assert.match(local.connectionStatus.message, /Failed to fetch/);
+assert.match(local.connectionStatus.message, /屬正常/);
 assert(!JSON.stringify(local).includes('SECRET_MUST_NOT_LEAK'));
 failure = 'auth';
 await poll();

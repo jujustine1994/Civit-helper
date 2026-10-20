@@ -52,7 +52,16 @@ def main(argv=None):
             day = taipei_now().date().isoformat()
             if (args.command == 'run' and not store.pending()
                     and all(store.progress(day)[k] >= n for k, n in TARGETS.items())):
-                output({'status': 'complete', 'progress': store.progress(day)})
+                # Record it: otherwise the window keeps showing the previous diagnostic and
+                # pressing 「立即執行」 looks like it did nothing.
+                counts = store.progress(day)
+                message = f'今天已完成（愛心 {counts["heart"]}/50、追蹤 {counts["follow"]}/3），不需要再執行。'
+                run_id = store.start_run(args.source + '/' + args.command)
+                store.end_run(run_id, 'complete', message)
+                logging.info('run_id=%s already complete today; nothing to do', run_id)
+                from civit_helper.history import write_history
+                write_history(store)
+                output({'status': 'complete', 'message': message, 'progress': counts})
                 return 0
             run_id = store.start_run(args.source + '/' + args.command)
             logging.info('run_id=%s started', run_id)
@@ -82,15 +91,13 @@ def main(argv=None):
             from civit_helper.site import LoginRequired, VerificationRequired
             from civit_helper.bridge import BridgeError, ensure_extension_config
             from civit_helper.remote_site import BridgeSite
-            from civit_helper.daily_chrome import DailyChrome
             try:
                 ensure_extension_config()
                 if args.command == 'doctor':
                     from civit_helper.diagnostics import check_connection
                     with store.db:
                         store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待連線診斷；請重新載入0.2.1擴充功能並按「立即連接」。此模式不操作網站。', run_id))
-                    with DailyChrome():
-                        result = check_connection()
+                    result = check_connection()
                 elif args.command == 'login':
                     from civit_helper.login import open_daily_browser
                     open_daily_browser()
@@ -98,7 +105,7 @@ def main(argv=None):
                 else:
                     with store.db:
                         store.db.execute('UPDATE runs SET message=? WHERE id=?', ('等待日常 Chrome 擴充功能連線，請確認已載入 Civit Helper。', run_id))
-                    with DailyChrome(), BridgeSite(seconds=1200) as site:
+                    with BridgeSite(seconds=1200) as site:
                         if args.command == 'inspect':
                             diagnostic = site.inspect()
                             if diagnostic.get('logged_in'):
@@ -125,6 +132,9 @@ def main(argv=None):
                 result = {'status': status, 'message': safe, 'progress': store.progress(day)}
             store.end_run(run_id, result['status'], result['message'])
             logging.info('run_id=%s result=%s', run_id, json.dumps(result, ensure_ascii=False))
+            if args.command == 'run':
+                from civit_helper.history import write_history
+                write_history(store)
             output(result)
             return 0 if result['status'] in ('complete', 'ready', 'setup_required') else 2
     except BusyError as exc:
